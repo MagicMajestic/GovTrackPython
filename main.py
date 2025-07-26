@@ -3,6 +3,7 @@ Main application entry point for Discord Curator Monitoring System
 This file identifies the project as GovTracker2 Flask migration
 """
 
+import os
 from app import app
 import routes  # noqa: F401
 import discord_bot

@@ -35,7 +35,16 @@ database_url = os.environ.get("DATABASE_URL")
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url or "postgresql://localhost/govtracker2"
+# Support MySQL URLs as well
+if not database_url:
+    # Try MySQL first, then PostgreSQL as fallback
+    mysql_url = os.environ.get("MYSQL_URL") or os.environ.get("MYSQL_DATABASE_URL")
+    if mysql_url:
+        database_url = mysql_url
+    else:
+        database_url = "postgresql://localhost/govtracker2"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,

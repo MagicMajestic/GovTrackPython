@@ -1,9 +1,8 @@
 """
-COMPLETE Database models for Discord Curator Monitoring System
-Full recreation based on original govtracker2 system with ALL features
+Database models for Discord Curator Monitoring System
 PostgreSQL/MySQL compatible schema using SQLAlchemy
 
-PROJECT IDENTIFIER: Complete GovTracker2 models with response tracking
+PROJECT IDENTIFIER: All models preserve original govtracker2 schema structure
 """
 
 from app import db
@@ -12,7 +11,6 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# Core system configuration tables
 class BotSettings(db.Model):
     """Bot configuration settings"""
     __tablename__ = 'bot_settings'
@@ -44,15 +42,14 @@ class BackupSettings(db.Model):
     next_backup = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
 
-# Rating system tables
 class RatingSettings(db.Model):
-    """Performance rating thresholds - Великолепно/Хорошо/Нормально/Плохо/Ужасно"""
+    """Performance rating thresholds"""
     __tablename__ = 'rating_settings'
     
     id = db.Column(db.Integer, primary_key=True)
-    rating_name = db.Column(db.String(100), nullable=False)  # excellent, good, normal, poor, terrible
-    rating_text = db.Column(db.String(100), nullable=False)  # Великолепно, Хорошо, etc.
-    min_score = db.Column(db.Integer, nullable=False)  # 50+, 35+, 20+, 10+, 0+
+    rating_name = db.Column(db.String(100), nullable=False)
+    rating_text = db.Column(db.String(100), nullable=False)
+    min_score = db.Column(db.Integer, nullable=False)
     color = db.Column(db.String(50), nullable=False)
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
 
@@ -69,86 +66,61 @@ class GlobalRatingConfig(db.Model):
     response_time_poor_seconds = db.Column(db.Integer, nullable=False, default=300)
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
 
-# Core entity tables
 class DiscordServers(db.Model):
-    """Discord servers being monitored - 8 servers total"""
+    """Discord servers being monitored"""
     __tablename__ = 'discord_servers'
     
     id = db.Column(db.Integer, primary_key=True)
     server_id = db.Column(db.String(255), nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False)
-    role_tag_id = db.Column(db.String(255))  # Role ID for curator notifications
-    completed_tasks_channel_id = db.Column(db.String(255))  # Channel for task reports
+    role_tag_id = db.Column(db.String(255))
+    completed_tasks_channel_id = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=True)
-    is_connected = db.Column(db.Boolean, default=False)
-    last_seen = db.Column(db.DateTime)
-    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    activities = relationship('Activities', backref='server', lazy='dynamic')
+    response_trackings = relationship('ResponseTracking', backref='server', lazy='dynamic')
 
 class Curators(db.Model):
-    """Curators (moderators) with performance tracking"""
+    """Discord curators/moderators being tracked"""
     __tablename__ = 'curators'
     
     id = db.Column(db.Integer, primary_key=True)
     discord_id = db.Column(db.String(255), nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False)
-    factions = db.Column(JSON)  # Array of faction names
-    curator_type = db.Column(db.String(100))  # Type of curator
-    subdivision = db.Column(db.String(255))  # Subdivision within faction
+    # MySQL compatibility: JSON instead of ARRAY for factions
+    factions = db.Column(db.JSON, nullable=False)
+    curator_type = db.Column(db.String(100), nullable=False)
+    subdivision = db.Column(db.String(100))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=func.now())
-    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
-
-# Activity tracking tables - CORE FUNCTIONALITY
-class Activities(db.Model):
-    """Curator activity tracking (messages, reactions, replies)"""
-    __tablename__ = 'activities'
     
-    id = db.Column(db.Integer, primary_key=True)
-    curator_id = db.Column(db.Integer, ForeignKey('curators.id'), nullable=False)
-    server_id = db.Column(db.Integer, ForeignKey('discord_servers.id'), nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # message, reaction, reply
-    channel_id = db.Column(db.String(255), nullable=False)
-    channel_name = db.Column(db.String(255))
-    message_id = db.Column(db.String(255))
-    content = db.Column(db.Text)
-    reaction_emoji = db.Column(db.String(100))
-    target_message_id = db.Column(db.String(255))  # For replies/reactions
-    target_message_content = db.Column(db.Text)
-    timestamp = db.Column(db.DateTime, default=func.now())
-
     # Relationships
-    curator = relationship("Curators", backref="activities")
-    server = relationship("DiscordServers", backref="activities")
+    activities = relationship('Activities', backref='curator', lazy='dynamic')
+    response_trackings = relationship('ResponseTracking', backref='curator', lazy='dynamic')
 
 class ResponseTracking(db.Model):
-    """CRITICAL: Response time tracking - Core feature of the system"""
+    """Critical: Curator response time tracking"""
     __tablename__ = 'response_tracking'
     
     id = db.Column(db.Integer, primary_key=True)
     server_id = db.Column(db.Integer, ForeignKey('discord_servers.id'), nullable=False)
     curator_id = db.Column(db.Integer, ForeignKey('curators.id'))
-    mention_message_id = db.Column(db.String(255), nullable=False, unique=True)
+    mention_message_id = db.Column(db.String(255), nullable=False)
     mention_timestamp = db.Column(db.DateTime, nullable=False)
-    mention_content = db.Column(db.Text)
-    mention_author_id = db.Column(db.String(255))
-    mention_author_name = db.Column(db.String(255))
     response_message_id = db.Column(db.String(255))
     response_timestamp = db.Column(db.DateTime)
-    response_type = db.Column(db.String(50))  # message, reaction
+    response_type = db.Column(db.String(50))
     response_time_seconds = db.Column(db.Integer)
-    is_resolved = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=func.now())
-
-    # Relationships
-    curator = relationship("Curators", backref="response_tracking")
-    server = relationship("DiscordServers", backref="response_tracking")
 
 class TaskReports(db.Model):
-    """Weekly task reports with curator verification system"""
+    """Task completion reports from completed-tasks channels"""
     __tablename__ = 'task_reports'
     
     id = db.Column(db.Integer, primary_key=True)
     server_id = db.Column(db.Integer, ForeignKey('discord_servers.id'), nullable=False)
+    author_id = db.Column(db.String(255), nullable=False)
+    author_name = db.Column(db.String(255), nullable=False)
     message_id = db.Column(db.String(255), nullable=False, unique=True)
     channel_id = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -161,18 +133,24 @@ class TaskReports(db.Model):
     approved_tasks = db.Column(db.Integer)
     status = db.Column(db.String(50), nullable=False, default='pending')
     week_start = db.Column(db.DateTime, nullable=False)
-    task_type = db.Column(db.String(100))
-    description = db.Column(db.Text)
-    evidence = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=func.now())
-    verified_at = db.Column(db.DateTime)
-    verified_by = db.Column(db.String(255))
-    
-    # Relationships
-    curator = relationship("Curators", backref="task_reports")
-    server = relationship("DiscordServers", backref="task_reports")
 
-# Additional system tables
+class Activities(db.Model):
+    """Curator activity tracking (messages, reactions, replies)"""
+    __tablename__ = 'activities'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    curator_id = db.Column(db.Integer, ForeignKey('curators.id'), nullable=False)
+    server_id = db.Column(db.Integer, ForeignKey('discord_servers.id'), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    channel_id = db.Column(db.String(255), nullable=False)
+    channel_name = db.Column(db.String(255))
+    message_id = db.Column(db.String(255))
+    content = db.Column(db.Text)
+    reaction_emoji = db.Column(db.String(100))
+    target_message_id = db.Column(db.String(255))
+    target_message_content = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=func.now())
+
 class ExcludedCurators(db.Model):
     """Curators excluded from import/tracking"""
     __tablename__ = 'excluded_curators'
@@ -188,23 +166,5 @@ class Users(db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    discord_id = db.Column(db.String(255), unique=True)
     username = db.Column(db.String(255), nullable=False, unique=True)
-    role = db.Column(db.String(50), default='user')  # admin, user
-    password_hash = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=func.now())
-    last_login = db.Column(db.DateTime)
-
-print("✅ Complete database models loaded with ALL tables:")
-print("- BotSettings (bot configuration)")
-print("- NotificationSettings (Discord notifications)")
-print("- BackupSettings (automated backups)")
-print("- RatingSettings (Великолепно/Хорошо/Нормально/Плохо/Ужасно)")
-print("- GlobalRatingConfig (rating calculation)")
-print("- DiscordServers (8 monitored servers)")
-print("- Curators (moderator profiles)")
-print("- Activities (message/reaction/reply tracking)")
-print("- ResponseTracking (CORE: response time calculation)")
-print("- TaskReports (task verification system)")
-print("- ExcludedCurators (exclusion management)")
-print("- Users (authentication system)")
+    password = db.Column(db.String(255), nullable=False)

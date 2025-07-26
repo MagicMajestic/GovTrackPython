@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GovTracker2 - Система мониторинга кураторов</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: #1c1c20; border-right: 1px solid #333; }
+        .main-content { flex: 1; overflow-y: auto; }
+        
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #333; }
+        .sidebar-nav { padding: 10px 0; }
+        .nav-item { 
+            display: flex; align-items: center; gap: 12px; 
+            padding: 12px 20px; color: #b0b0b0; text-decoration: none;
+            transition: all 0.2s; cursor: pointer;
+        }
+        .nav-item:hover, .nav-item.active { 
+            background: #2a2a2e; color: #fff; 
+        }
+        .nav-icon { width: 20px; height: 20px; }
+        
+        .header { 
+            background: #1c1c20; border-bottom: 1px solid #333; 
+            padding: 20px 30px; position: sticky; top: 0; z-index: 10;
+        }
+        .header-title { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
+        .header-subtitle { color: #b0b0b0; font-size: 14px; }
+        
+        .content { padding: 30px; }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 20px; margin-bottom: 30px; 
+        }
+        .stat-card { 
+            background: #1c1c20; border: 1px solid #333; 
+            border-radius: 12px; padding: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+        }
+        .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .stat-icon { 
+            width: 48px; height: 48px; border-radius: 12px; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+        }
+        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .stat-label { color: #b0b0b0; font-size: 14px; margin-bottom: 8px; }
+        
+        .blue { background: rgba(59, 130, 246, 0.1); color: #60a5fa; }
+        .green { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
+        .orange { background: rgba(251, 146, 60, 0.1); color: #fb923c; }
+        .yellow { background: rgba(234, 179, 8, 0.1); color: #facc15; }
+        .red { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+        
+        .table-container { background: #1c1c20; border: 1px solid #333; border-radius: 12px; overflow: hidden; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th { 
+            background: #2a2a2e; padding: 16px; text-align: left; 
+            font-weight: 600; color: #fff; border-bottom: 1px solid #333;
+        }
+        .table td { padding: 16px; border-bottom: 1px solid #333; }
+        .table tr:hover { background: #2a2a2e; }
+        
+        .btn { 
+            padding: 10px 20px; border-radius: 8px; border: none; 
+            font-weight: 500; cursor: pointer; transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        
+        .status-indicator { 
+            width: 12px; height: 12px; border-radius: 50%; 
+            display: inline-block; margin-right: 8px;
+        }
+        .status-online { background-color: #10b981; }
+        .status-offline { background-color: #ef4444; }
+        .status-warning { background-color: #f59e0b; }
+        
+        .loading { 
+            display: flex; align-items: center; justify-content: center; 
+            height: 200px; color: #b0b0b0;
+        }
+        
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #f87171;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .success-message {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid #22c55e;
+            color: #4ade80;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px;
+            background: #2a2a2e;
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; order: 2; }
+            .main-content { order: 1; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, Fragment } = React;
+        
+        // API client
+        const api = {
+            async get(url) {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            },
+            async post(url, data) {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            }
+        };
+        
+        // Navigation component
+        const Sidebar = ({ currentPage, onNavigate }) => {
+            const navItems = [
+                { id: 'dashboard', label: 'Панель управления', icon: '📊' },
+                { id: 'curators', label: 'Кураторы', icon: '👥' },
+                { id: 'activity', label: 'Активность', icon: '📈' },
+                { id: 'tasks', label: 'Отчеты задач', icon: '📋' },
+                { id: 'servers', label: 'Серверы', icon: '🖥️' },
+                { id: 'settings', label: 'Настройки', icon: '⚙️' }
+            ];
+            
+            return (
+                <div className="sidebar">
+                    <div className="sidebar-header">
+                        <h1 style={{fontSize: '18px', fontWeight: '600'}}>🎯 GovTracker2</h1>
+                        <p style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                            Система мониторинга кураторов
+                        </p>
+                    </div>
+                    <nav className="sidebar-nav">
+                        {navItems.map(item => (
+                            <div 
+                                key={item.id}
+                                className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
+                                onClick={() => onNavigate(item.id)}
+                            >
+                                <span className="nav-icon">{item.icon}</span>
+                                {item.label}
+                            </div>
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
+        
+        // Dashboard component
+        const Dashboard = () => {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            
+            useEffect(() => {
+                loadStats();
+                const interval = setInterval(loadStats, 10000);
+                return () => clearInterval(interval);
+            }, []);
+            
+            const loadStats = async () => {
+                try {
+                    setError(null);
+                    const data = await api.get('/api/dashboard/stats');
+                    setStats(data);
+                } catch (error) {
+                    console.error('Failed to load stats:', error);
+                    setError('Не удалось загрузить статистику');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            if (loading) return <div className="loading">Загрузка статистики...</div>;
+            if (error) return <div className="error-message">{error}</div>;
+            
+            const statCards = [
+                {
+                    title: 'Активных кураторов',
+                    value: stats?.totalCurators || 0,
+                    icon: '👥',
+                    color: 'blue'
+                },
+                {
+                    title: 'Серверов мониторится', 
+                    value: stats?.activeServers || 0,
+                    icon: '🖥️',
+                    color: 'green'
+                },
+                {
+                    title: 'Активностей сегодня',
+                    value: stats?.todayActivities || 0,
+                    icon: '📈',
+                    color: 'orange'
+                },
+                {
+                    title: 'Среднее время ответа',
+                    value: `${stats?.avgResponseTime || 0} мин`,
+                    icon: '⏱️',
+                    color: 'yellow'
+                }
+            ];
+            
+            return (
+                <div>
+                    <div className="header">
+                        <h1 className="header-title">Панель управления</h1>
+                        <p className="header-subtitle">
+                            Последнее обновление: {new Date().toLocaleTimeString('ru-RU')}
+                        </p>
+                    </div>
+                    <div className="content">
+                        <div className="stats-grid">
+                            {statCards.map((card, index) => (
+                                <div key={index} className="stat-card">
+                                    <div className="stat-header">
+                                        <div className={`stat-icon ${card.color}`}>
+                                            {card.icon}
+                                        </div>
+                                        <div style={{textAlign: 'right'}}>
+                                            <div className="stat-value">{card.value}</div>
+                                            <div className="stat-label">{card.title}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <SystemStatus />
+                    </div>
+                </div>
+            );
+        };
+        
+        // System status component
+        const SystemStatus = () => {
+            const [botStatus, setBotStatus] = useState(null);
+            
+            useEffect(() => {
+                checkBotStatus();
+                const interval = setInterval(checkBotStatus, 30000);
+                return () => clearInterval(interval);
+            }, []);
+            
+            const checkBotStatus = async () => {
+                try {
+                    const data = await api.get('/api/bot/status');
+                    setBotStatus(data);
+                } catch (error) {
+                    setBotStatus({ connected: false, status: 'error' });
+                }
+            };
+            
+            return (
+                <div className="table-container">
+                    <h2 style={{padding: '20px', margin: 0, fontSize: '18px', fontWeight: '600'}}>📊 Статус системы</h2>
+                    <div style={{padding: '20px', display: 'grid', gap: '12px'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <span>
+                                <span className="status-indicator status-online"></span>
+                                Flask Backend
+                            </span>
+                            <span style={{color: '#4ade80'}}>✅ Работает</span>
+                        </div>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <span>
+                                <span className={`status-indicator ${botStatus?.connected ? 'status-online' : 'status-warning'}`}></span>
+                                Discord Bot
+                            </span>
+                            <span style={{color: botStatus?.connected ? '#4ade80' : '#f59e0b'}}>
+                                {botStatus?.connected ? '✅ Подключен' : '⚠️ Требуется токен'}
+                            </span>
+                        </div>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            <span>
+                                <span className="status-indicator status-online"></span>
+                                База данных PostgreSQL
+                            </span>
+                            <span style={{color: '#4ade80'}}>✅ Подключена</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // Curators component
+        const Curators = () => {
+            const [curators, setCurators] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            
+            useEffect(() => {
+                loadCurators();
+                const interval = setInterval(loadCurators, 10000);
+                return () => clearInterval(interval);
+            }, []);
+            
+            const loadCurators = async () => {
+                try {
+                    setError(null);
+                    const data = await api.get('/api/curators');
+                    setCurators(Array.isArray(data) ? data : []);
+                } catch (error) {
+                    console.error('Failed to load curators:', error);
+                    setError('Не удалось загрузить список кураторов');
+                    setCurators([]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const formatResponseTime = (seconds) => {
+                if (!seconds) return 'Н/Д';
+                if (seconds < 60) return `${seconds}с`;
+                if (seconds < 3600) return `${Math.round(seconds / 60)}м`;
+                return `${Math.round(seconds / 3600)}ч`;
+            };
+            
+            if (loading) return <div className="loading">Загрузка кураторов...</div>;
+            if (error) return <div className="error-message">{error}</div>;
+            
+            return (
+                <div>
+                    <div className="header">
+                        <h1 className="header-title">Управление кураторами</h1>
+                        <p className="header-subtitle">Всего кураторов: {curators.length}</p>
+                    </div>
+                    <div className="content">
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Имя</th>
+                                        <th>Discord ID</th>
+                                        <th>Фракции</th>
+                                        <th>Активность</th>
+                                        <th>Время ответа</th>
+                                        <th>Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {curators.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{textAlign: 'center', color: '#9ca3af'}}>
+                                                Кураторы не найдены
+                                            </td>
+                                        </tr>
+                                    ) : curators.map(curator => (
+                                        <tr key={curator.id}>
+                                            <td style={{fontWeight: '600'}}>{curator.name}</td>
+                                            <td style={{fontFamily: 'monospace', fontSize: '12px'}}>{curator.discord_id}</td>
+                                            <td>{Array.isArray(curator.factions) ? curator.factions.join(', ') : 'Не указано'}</td>
+                                            <td>{curator.activity_count || 0}</td>
+                                            <td>{formatResponseTime(curator.avg_response_time)}</td>
+                                            <td>
+                                                <span className={`status-indicator ${curator.is_active ? 'status-online' : 'status-offline'}`}></span>
+                                                {curator.is_active ? 'Активен' : 'Неактивен'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // Activity component
+        const Activity = () => {
+            const [activities, setActivities] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            
+            useEffect(() => {
+                loadActivities();
+                const interval = setInterval(loadActivities, 10000);
+                return () => clearInterval(interval);
+            }, []);
+            
+            const loadActivities = async () => {
+                try {
+                    setError(null);
+                    const data = await api.get('/api/activities/recent');
+                    setActivities(Array.isArray(data) ? data : []);
+                } catch (error) {
+                    console.error('Failed to load activities:', error);
+                    setError('Не удалось загрузить активность');
+                    setActivities([]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            const formatTime = (timestamp) => {
+                if (!timestamp) return 'Н/Д';
+                const date = new Date(timestamp);
+                return date.toLocaleString('ru-RU');
+            };
+            
+            const getActivityTypeText = (type) => {
+                const types = {
+                    'message': 'Сообщение',
+                    'reaction': 'Реакция',
+                    'reply': 'Ответ'
+                };
+                return types[type] || type;
+            };
+            
+            if (loading) return <div className="loading">Загрузка активности...</div>;
+            if (error) return <div className="error-message">{error}</div>;
+            
+            return (
+                <div>
+                    <div className="header">
+                        <h1 className="header-title">История активности</h1>
+                        <p className="header-subtitle">Последние {activities.length} действий</p>
+                    </div>
+                    <div className="content">
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Время</th>
+                                        <th>Куратор</th>
+                                        <th>Тип</th>
+                                        <th>Сервер</th>
+                                        <th>Канал</th>
+                                        <th>Содержание</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {activities.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" style={{textAlign: 'center', color: '#9ca3af'}}>
+                                                Активность не найдена
+                                            </td>
+                                        </tr>
+                                    ) : activities.map(activity => (
+                                        <tr key={activity.id}>
+                                            <td style={{fontSize: '12px'}}>{formatTime(activity.timestamp)}</td>
+                                            <td style={{fontWeight: '600'}}>{activity.curator_name}</td>
+                                            <td>{getActivityTypeText(activity.type)}</td>
+                                            <td>{activity.server_name}</td>
+                                            <td>#{activity.channel_name}</td>
+                                            <td style={{maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                                                {activity.content || 'Н/Д'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // Simple placeholder components
+        const TaskReports = () => (
+            <div>
+                <div className="header">
+                    <h1 className="header-title">Отчеты задач</h1>
+                    <p className="header-subtitle">Система верификации задач</p>
+                </div>
+                <div className="content">
+                    <div className="success-message">
+                        Функция отчетов задач готова к настройке Discord интеграции
+                    </div>
+                </div>
+            </div>
+        );
+        
+        const Servers = () => (
+            <div>
+                <div className="header">
+                    <h1 className="header-title">Управление серверами</h1>
+                    <p className="header-subtitle">8 мониторимых Discord серверов</p>
+                </div>
+                <div className="content">
+                    <div className="success-message">
+                        Серверы: Government, FIB, LSPD, SANG, LSCSD, EMS, Weazel News, Detectives
+                    </div>
+                </div>
+            </div>
+        );
+        
+        const Settings = () => (
+            <div>
+                <div className="header">
+                    <h1 className="header-title">Настройки системы</h1>
+                    <p className="header-subtitle">Конфигурация бота и уведомлений</p>
+                </div>
+                <div className="content">
+                    <div className="success-message">
+                        Настройки готовы. Требуется DISCORD_BOT_TOKEN для полной функциональности.
+                    </div>
+                </div>
+            </div>
+        );
+        
+        // Main App component
+        const App = () => {
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            
+            const renderPage = () => {
+                switch (currentPage) {
+                    case 'dashboard': return <Dashboard />;
+                    case 'curators': return <Curators />;
+                    case 'activity': return <Activity />;
+                    case 'tasks': return <TaskReports />;
+                    case 'servers': return <Servers />;
+                    case 'settings': return <Settings />;
+                    default: return <Dashboard />;
+                }
+            };
+            
+            return (
+                <div className="app-container">
+                    <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+                    <div className="main-content">
+                        {renderPage()}
+                    </div>
+                </div>
+            );
+        };
+        
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

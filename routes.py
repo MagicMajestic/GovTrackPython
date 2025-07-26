@@ -16,15 +16,24 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Serve React frontend
+# Serve working dashboard
 @app.route('/')
 @app.route('/<path:path>')
 def serve_frontend(path=''):
-    """Serve React build files from static directory"""
+    """Serve working dashboard interface"""
+    if path == '' or path.startswith('api/'):
+        # Serve the dashboard HTML file directly
+        with open('templates/dashboard.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    
+    # For other paths, try static files first
     static_folder = app.static_folder or 'static/build'
     if path and os.path.exists(os.path.join(static_folder, path)):
         return send_from_directory(static_folder, path)
-    return send_from_directory(static_folder, 'index.html')
+    
+    # Fallback to dashboard
+    with open('templates/dashboard.html', 'r', encoding='utf-8') as f:
+        return f.read()
 
 # API Routes - preserving all original functionality
 
@@ -736,5 +745,18 @@ def not_found(error):
 def internal_error(error):
     db.session.rollback()
     return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/bot/status')
+def bot_status():
+    """Get Discord bot connection status"""
+    try:
+        bot_token = os.environ.get('DISCORD_BOT_TOKEN')
+        return jsonify({
+            'connected': bot_token is not None,
+            'status': 'connected' if bot_token else 'token_required'
+        })
+    except Exception as e:
+        logger.error(f"Bot status error: {e}")
+        return jsonify({'connected': False, 'status': 'error'}), 500
 
 logger.info("All API routes registered successfully")
